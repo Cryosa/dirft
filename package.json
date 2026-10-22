@@ -1,0 +1,38 @@
+{
+  "name": "dirft",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Node development for Vite: builtins external, lazy execution and process restart.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cryosa/dirft.git"
+  },
+  "files": ["dist", "types"],
+  "exports": {
+    ".": { "types": "./types/index.d.ts", "import": "./dist/index.js" },
+    "./vite": {
+      "types": "./types/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "engines": {
+    "node": ">=22.15.0"
+  },
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "vite --config examples/library/vite.config.ts --mode development",
+    "build:example": "vite build --config examples/library/vite.config.ts",
+    "check": "tsc -p tsconfig.json",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "clean": "node scripts/clean.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.5",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "typescript": "6.0.3",
+    "vite": "^8.3.5"
+  },
+  "peerDependencies": { "vite": ">=6.4.1 <9" }
+}

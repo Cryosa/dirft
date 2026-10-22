@@ -1,0 +1,85 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: 22
+            vite: '6.4.1'
+          - os: ubuntu-latest
+            node: 24
+            vite: '7'
+          - os: ubuntu-latest
+            node: 26
+            vite: ''
+          - os: windows-latest
+            node: 22
+            vite: ''
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      - name: Install compatibility host
+        if: matrix.vite != ''
+        run: npm install --prefix node_modules/.compat --no-save --package-lock=false vite@${{ matrix.vite }}
+      - run: npm run check
+      - run: npm test
+        env:
+          DIRFT_TEST_VITE: ${{ matrix.vite && 'node_modules/.compat/node_modules/vite/dist/node/index.js' || '' }}
+      - run: npm run build:example
+      - run: npm pack --dry-run
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Set version from tag
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]
+          npm version "$version" --no-git-tag-version --ignore-scripts --allow-same-version
+          test "$(node -p "require('./package.json').version")" = "$version"
+      - run: npm run build
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          package_file=$(npm pack --pack-destination "$RUNNER_TEMP" --silent)
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$RUNNER_TEMP/$package_file" --clobber
+          else
+            flags=()
+            if [[ "${GITHUB_REF_NAME#v}" == *-* ]]; then flags+=(--prerelease); fi
+            gh release create "$GITHUB_REF_NAME" "$RUNNER_TEMP/$package_file" --verify-tag --generate-notes "${flags[@]}"
+          fi
