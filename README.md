@@ -18,5 +18,3 @@ export default defineConfig({
   },
 })
 ```
-
-转译、别名和插件复用 Vite，缓存统一放在 Vite `cacheDir`。静态依赖并发预热，动态导入按需加载；重启复用有效模块代码和 V8 编译缓存，每次仍启动全新 Node 进程。
